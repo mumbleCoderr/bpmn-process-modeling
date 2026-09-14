@@ -92,5 +92,9 @@ przebiegu procesu i nie może wymuszać wdrożenia nowej wersji diagramu BPMN.
 Każda decyzja zapisuje identyfikator wersji modelu, inaczej po roku nie da się
 odtworzyć, na jakiej podstawie zapadła.
 
+Realizacja tej zasady: tabele powyżej są zapisane jako model decyzyjny DMN
+(`diagramy/scoring-kredytowy.dmn`), a silnik wywołuje je z zadania reguł
+biznesowych - patrz [tabele decyzyjne DMN](08-tabele-decyzyjne-dmn.md).
+
 ---
 Autor: Mateusz Biernat

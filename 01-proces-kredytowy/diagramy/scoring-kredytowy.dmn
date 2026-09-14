@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="scoring-kredytowy"
+             name="Scoring kredytowy"
+             namespace="http://camunda.org/schema/1.0/dmn"
+             exporter="Mateusz Biernat"
+             exporterVersion="1.0">
+
+  <!-- ==========================================================
+       Model scoringowy jako tabele decyzyjne.
+
+       Progi ryzyka zmieniaja sie czesciej niz przebieg procesu, wiec stoja
+       osobno od diagramu BPMN: zmiana wagi albo granicy klasy to wdrozenie
+       nowej wersji TEJ decyzji, a nie nowej wersji procesu.
+       ========================================================== -->
+
+  <!-- 1. Wskaznik DTI: ile z dochodu zabiora wszystkie raty.
+       Zaokraglenie w GORE, nie do najblizszej wartosci: obcinanie zanizaloby
+       obciazenie klienta, a przy progu 30 i 45 procent kazda setna decyduje
+       o punktach. Zaokraglamy na niekorzysc wniosku, bo taki blad jest tanszy. -->
+  <decision id="wskaznik-dti" name="Wskaznik DTI">
+    <variable id="zmienna-dti" name="dti" typeRef="number" />
+    <literalExpression id="wyrazenie-dti">
+      <text>round up((kwota / okresMiesiecy + sumaRatMiesiecznych) / dochodNetto * 100, 2)</text>
+    </literalExpression>
+  </decision>
+
+  <!-- 2. Punktacja: kazdy czynnik dokłada swoje punkty.
+       Polityka trafien COLLECT z agregacja SUM - wszystkie pasujace reguly
+       sumuja sie zamiast wygrywac jedna. Tak samo liczy to polityka kredytowa:
+       czynniki sie dodaja, nie wykluczaja. -->
+  <decision id="punktacja-kredytowa" name="Punktacja scoringowa">
+    <variable id="zmienna-punktacja" name="punktacja" typeRef="number" />
+    <informationRequirement id="wymog-dti-1">
+      <requiredDecision href="#wskaznik-dti" />
+    </informationRequirement>
+    <decisionTable id="tabela-punktacja" hitPolicy="COLLECT" aggregation="SUM">
+      <input id="wej-bik" label="Scoring BIK">
+        <inputExpression id="wyr-bik" typeRef="number"><text>scoringBik</text></inputExpression>
+      </input>
+      <input id="wej-dti" label="Wskaznik DTI (%)">
+        <inputExpression id="wyr-dti" typeRef="number"><text>dti</text></inputExpression>
+      </input>
+      <input id="wej-staz" label="Staz w miesiacach">
+        <inputExpression id="wyr-staz" typeRef="number"><text>stazMiesiecy</text></inputExpression>
+      </input>
+      <input id="wej-wpisy" label="Wpisy negatywne">
+        <inputExpression id="wyr-wpisy" typeRef="number"><text>wpisyNegatywne</text></inputExpression>
+      </input>
+      <output id="wyj-punkty" label="Punkty" name="punkty" typeRef="number" />
+
+      <rule id="r-bik-1">
+        <description>Historia splat bez zastrzezen</description>
+        <inputEntry id="r1i1"><text>&gt;= 700</text></inputEntry>
+        <inputEntry id="r1i2"><text>-</text></inputEntry>
+        <inputEntry id="r1i3"><text>-</text></inputEntry>
+        <inputEntry id="r1i4"><text>-</text></inputEntry>
+        <outputEntry id="r1o1"><text>35</text></outputEntry>
+      </rule>
+      <rule id="r-bik-2">
+        <description>Historia splat przecietna</description>
+        <inputEntry id="r2i1"><text>[620..700)</text></inputEntry>
+        <inputEntry id="r2i2"><text>-</text></inputEntry>
+        <inputEntry id="r2i3"><text>-</text></inputEntry>
+        <inputEntry id="r2i4"><text>-</text></inputEntry>
+        <outputEntry id="r2o1"><text>20</text></outputEntry>
+      </rule>
+      <rule id="r-bik-3">
+        <description>Historia splat slaba</description>
+        <inputEntry id="r3i1"><text>&lt; 620</text></inputEntry>
+        <inputEntry id="r3i2"><text>-</text></inputEntry>
+        <inputEntry id="r3i3"><text>-</text></inputEntry>
+        <inputEntry id="r3i4"><text>-</text></inputEntry>
+        <outputEntry id="r3o1"><text>5</text></outputEntry>
+      </rule>
+
+      <rule id="r-dti-1">
+        <description>Raty do 30 procent dochodu</description>
+        <inputEntry id="r4i1"><text>-</text></inputEntry>
+        <inputEntry id="r4i2"><text>&lt;= 30</text></inputEntry>
+        <inputEntry id="r4i3"><text>-</text></inputEntry>
+        <inputEntry id="r4i4"><text>-</text></inputEntry>
+        <outputEntry id="r4o1"><text>25</text></outputEntry>
+      </rule>
+      <rule id="r-dti-2">
+        <description>Raty do 45 procent dochodu</description>
+        <inputEntry id="r5i1"><text>-</text></inputEntry>
+        <inputEntry id="r5i2"><text>(30..45]</text></inputEntry>
+        <inputEntry id="r5i3"><text>-</text></inputEntry>
+        <inputEntry id="r5i4"><text>-</text></inputEntry>
+        <outputEntry id="r5o1"><text>15</text></outputEntry>
+      </rule>
+      <rule id="r-dti-3">
+        <description>Raty powyzej 45 procent dochodu</description>
+        <inputEntry id="r6i1"><text>-</text></inputEntry>
+        <inputEntry id="r6i2"><text>&gt; 45</text></inputEntry>
+        <inputEntry id="r6i3"><text>-</text></inputEntry>
+        <inputEntry id="r6i4"><text>-</text></inputEntry>
+        <outputEntry id="r6o1"><text>3</text></outputEntry>
+      </rule>
+
+      <rule id="r-staz-1">
+        <description>Staz co najmniej dwa lata</description>
+        <inputEntry id="r7i1"><text>-</text></inputEntry>
+        <inputEntry id="r7i2"><text>-</text></inputEntry>
+        <inputEntry id="r7i3"><text>&gt;= 24</text></inputEntry>
+        <inputEntry id="r7i4"><text>-</text></inputEntry>
+        <outputEntry id="r7o1"><text>20</text></outputEntry>
+      </rule>
+      <rule id="r-staz-2">
+        <description>Staz krotszy niz dwa lata</description>
+        <inputEntry id="r8i1"><text>-</text></inputEntry>
+        <inputEntry id="r8i2"><text>-</text></inputEntry>
+        <inputEntry id="r8i3"><text>&lt; 24</text></inputEntry>
+        <inputEntry id="r8i4"><text>-</text></inputEntry>
+        <outputEntry id="r8o1"><text>10</text></outputEntry>
+      </rule>
+
+      <rule id="r-wpisy-1">
+        <description>Brak wpisow negatywnych</description>
+        <inputEntry id="r9i1"><text>-</text></inputEntry>
+        <inputEntry id="r9i2"><text>-</text></inputEntry>
+        <inputEntry id="r9i3"><text>-</text></inputEntry>
+        <inputEntry id="r9i4"><text>0</text></inputEntry>
+        <outputEntry id="r9o1"><text>15</text></outputEntry>
+      </rule>
+      <rule id="r-wpisy-2">
+        <description>Wpisy negatywne w rejestrach</description>
+        <inputEntry id="r10i1"><text>-</text></inputEntry>
+        <inputEntry id="r10i2"><text>-</text></inputEntry>
+        <inputEntry id="r10i3"><text>-</text></inputEntry>
+        <inputEntry id="r10i4"><text>&gt; 0</text></inputEntry>
+        <outputEntry id="r10o1"><text>0</text></outputEntry>
+      </rule>
+
+      <rule id="r-baza">
+        <description>Punkty bazowe za relacje z bankiem</description>
+        <inputEntry id="r11i1"><text>-</text></inputEntry>
+        <inputEntry id="r11i2"><text>-</text></inputEntry>
+        <inputEntry id="r11i3"><text>-</text></inputEntry>
+        <inputEntry id="r11i4"><text>-</text></inputEntry>
+        <outputEntry id="r11o1"><text>5</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <!-- 3. Klasa ryzyka i wynikajaca z niej sciezka.
+       Polityka FIRST: przedzialy sa rozlaczne, ale pierwsza pasujaca regula
+       konczy sprawe - dzieki temu bledny przedzial nie daje dwoch klas naraz. -->
+  <decision id="ocena-ryzyka" name="Ocena ryzyka kredytowego">
+    <variable id="zmienna-ocena" name="ocenaRyzyka" typeRef="context" />
+    <informationRequirement id="wymog-punktacja">
+      <requiredDecision href="#punktacja-kredytowa" />
+    </informationRequirement>
+    <informationRequirement id="wymog-dti-2">
+      <requiredDecision href="#wskaznik-dti" />
+    </informationRequirement>
+    <decisionTable id="tabela-ocena" hitPolicy="FIRST">
+      <input id="wej-punktacja" label="Punktacja">
+        <inputExpression id="wyr-punktacja" typeRef="number"><text>punktacja</text></inputExpression>
+      </input>
+      <output id="wyj-klasa" label="Klasa ryzyka" name="klasa" typeRef="string" />
+      <output id="wyj-punkty2" label="Punktacja" name="punktacja" typeRef="number" />
+      <output id="wyj-dti2" label="Wskaznik DTI" name="dti" typeRef="number" />
+      <output id="wyj-sciezka" label="Sciezka decyzji" name="sciezka" typeRef="string" />
+
+      <rule id="k-a">
+        <inputEntry id="kai"><text>&gt;= 85</text></inputEntry>
+        <outputEntry id="kao1"><text>"A"</text></outputEntry>
+        <outputEntry id="kao2"><text>punktacja</text></outputEntry>
+        <outputEntry id="kao3"><text>dti</text></outputEntry>
+        <outputEntry id="kao4"><text>"DECYZJA_AUTOMATYCZNA"</text></outputEntry>
+      </rule>
+      <rule id="k-b">
+        <inputEntry id="kbi"><text>[70..85)</text></inputEntry>
+        <outputEntry id="kbo1"><text>"B"</text></outputEntry>
+        <outputEntry id="kbo2"><text>punktacja</text></outputEntry>
+        <outputEntry id="kbo3"><text>dti</text></outputEntry>
+        <outputEntry id="kbo4"><text>"DECYZJA_AUTOMATYCZNA"</text></outputEntry>
+      </rule>
+      <rule id="k-c">
+        <inputEntry id="kci"><text>[55..70)</text></inputEntry>
+        <outputEntry id="kco1"><text>"C"</text></outputEntry>
+        <outputEntry id="kco2"><text>punktacja</text></outputEntry>
+        <outputEntry id="kco3"><text>dti</text></outputEntry>
+        <outputEntry id="kco4"><text>"ANALIZA_RECZNA"</text></outputEntry>
+      </rule>
+      <rule id="k-d">
+        <inputEntry id="kdi"><text>[40..55)</text></inputEntry>
+        <outputEntry id="kdo1"><text>"D"</text></outputEntry>
+        <outputEntry id="kdo2"><text>punktacja</text></outputEntry>
+        <outputEntry id="kdo3"><text>dti</text></outputEntry>
+        <outputEntry id="kdo4"><text>"ANALIZA_RECZNA_Z_ZABEZPIECZENIEM"</text></outputEntry>
+      </rule>
+      <rule id="k-e">
+        <inputEntry id="kei"><text>&lt; 40</text></inputEntry>
+        <outputEntry id="keo1"><text>"E"</text></outputEntry>
+        <outputEntry id="keo2"><text>punktacja</text></outputEntry>
+        <outputEntry id="keo3"><text>dti</text></outputEntry>
+        <outputEntry id="keo4"><text>"ODMOWA_AUTOMATYCZNA"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="diagram-scoring">
+      <dmndi:DMNShape id="ksztalt-dti" dmnElementRef="wskaznik-dti">
+        <dc:Bounds height="80" width="180" x="160" y="320" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="ksztalt-punktacja" dmnElementRef="punktacja-kredytowa">
+        <dc:Bounds height="80" width="180" x="160" y="180" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="ksztalt-ocena" dmnElementRef="ocena-ryzyka">
+        <dc:Bounds height="80" width="180" x="160" y="40" />
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="krawedz-1" dmnElementRef="wymog-dti-1">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" x="250" y="320" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" x="250" y="260" />
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="krawedz-2" dmnElementRef="wymog-punktacja">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" x="250" y="180" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" x="250" y="120" />
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

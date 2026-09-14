@@ -25,7 +25,8 @@ poprawce procesu.
 
 | Element modelu | Rozszerzenie Zeebe | Wartość |
 |---|---|---|
-| Zadania usługowe (8) | `zeebe:taskDefinition` | typ zadania dla workera, np. `scoring-kredytowy` |
+| Zadania usługowe (7) | `zeebe:taskDefinition` | typ zadania dla workera, np. `pobranie-raportow` |
+| Zadanie reguł biznesowych | `zeebe:calledDecision` + `zeebe:ioMapping` | decyzja DMN `ocena-ryzyka`, wynik rozpakowany na zmienne sprawy |
 | Zadania użytkownika (5) | `zeebe:userTask` + `zeebe:assignmentDefinition` | grupy: `doradcy`, `analitycy-ryzyka`, `komitet-kredytowy` |
 | Bramki wyłączne (4) | `conditionExpression` (FEEL) | warunki z katalogu reguł |
 | Bramki wyłączne (4) | atrybut `default` | ścieżka domyślna dla każdej bramki |
@@ -54,13 +55,14 @@ nie w czasie modelowania.
 ## Workery
 
 Zadania usługowe obsługuje `narzedzia/camunda_kredyt.py` przez **REST API v2**
-silnika - bez gRPC i bez dodatkowych bibliotek. Osiem typów zadań:
+silnika - bez gRPC i bez dodatkowych bibliotek. Siedem typów zadań; scoringu nie ma
+na tej liście, bo liczy go silnik reguł - patrz
+[tabele decyzyjne DMN](08-tabele-decyzyjne-dmn.md):
 
 | Typ zadania | Co robi zaślepka |
 |---|---|
 | `walidacja-wniosku` | sprawdza pola wymagane i zgodę BIK, ustawia `daneKompletne` |
 | `pobranie-raportow` | zwraca raport zależny od PESEL (ta sama sprawa - ten sam wynik) |
-| `scoring-kredytowy` | liczy DTI, punktację 0-100 i klasę ryzyka A-E |
 | `decyzja-automatyczna` | decyzja pozytywna z uzasadnieniem |
 | `odmowa-automatyczna` | decyzja negatywna z powodem z reguł |
 | `generowanie-umowy` | numer umowy i oprocentowanie |
@@ -93,7 +95,7 @@ tylko klasę, bank oddałby decyzję o 60 000 zł regule punktowej.
 # 1. Silnik (Camunda 8 Run, wymaga Javy 21+)
 ./c8run start                     # Operate: http://localhost:8080/operate
 
-# 2. Wdrożenie modelu
+# 2. Wdrożenie modelu procesu i tabel decyzyjnych (jedno wdrożenie)
 python narzedzia/camunda_kredyt.py deploy
 
 # 3. Nowa sprawa (publikacja komunikatu startowego)
@@ -112,14 +114,15 @@ Logowanie do Operate i Tasklist: `demo` / `demo`.
 
 ## Czego ta konfiguracja nie ma
 
-1. **Reguł scoringowych jako tabeli decyzyjnej DMN.** Scoring liczy worker, a nie
-   silnik reguł. W docelowym rozwiązaniu tabela DMN pozwala zmienić progi bez
-   wdrażania nowej wersji procesu - i o to samo chodzi w uwadze o wersjonowaniu
-   modelu w [katalogu reguł](03-katalog-zadan-i-regul.md).
-2. **Formularzy zadań.** Zadania użytkownika mają grupy odbiorców, ale nie mają
+1. **Formularzy zadań.** Zadania użytkownika mają grupy odbiorców, ale nie mają
    formularzy - decyzje wchodzą zmiennymi przez API.
-3. **Prawdziwych integracji.** Workery to zaślepki; kontrakty SOAP i REST stoją
+2. **Prawdziwych integracji.** Workery to zaślepki; kontrakty SOAP i REST stoją
    w [specyfikacji integracji](04-integracje.md).
+3. **Uwierzytelniania per rola.** Wszystko chodzi na koncie `demo`; grupy
+   odbiorców zadań są w modelu, ale nie stoją za nimi realne konta użytkowników.
+
+Scoringu **nie ma już na tej liście**: przeniosłem go z workera do tabel
+decyzyjnych DMN, co opisuje [osobny dokument](08-tabele-decyzyjne-dmn.md).
 
 ---
 Autor: Mateusz Biernat

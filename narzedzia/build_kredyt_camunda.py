@@ -24,12 +24,31 @@ from build_kredyt import OUT, to_be, zapisz  # noqa: E402
 TYPY_ZADAN = {
     "T_waliduj": "walidacja-wniosku",
     "T_bik": "pobranie-raportow",
-    "T_scoring": "scoring-kredytowy",
     "T_auto": "decyzja-automatyczna",
     "T_odmowa_auto": "odmowa-automatyczna",
     "T_umowa": "generowanie-umowy",
     "T_powiadom": "powiadomienie-klienta",
     "T_uruchom": "uruchomienie-kredytu",
+}
+
+# --- scoring liczy silnik regul (DMN), nie worker ---
+# Progi ryzyka zmieniaja sie czesciej niz przebieg procesu, wiec zadanie regul
+# biznesowych wola tabele decyzyjna. Zmiana wagi czynnika to wdrozenie nowej
+# wersji decyzji, bez ruszania modelu BPMN.
+DECYZJA_DMN = {
+    "T_scoring": {
+        "decision_id": "ocena-ryzyka",
+        "result_variable": "ocenaRyzyka",
+        # wynik decyzji to kontekst; rozpakowujemy go na zmienne sprawy, zeby
+        # warunki na bramkach zostaly takie same jak w modelu biznesowym
+        "outputs": [
+            ("klasaRyzyka", "=ocenaRyzyka.klasa"),
+            ("punktacja", "=ocenaRyzyka.punktacja"),
+            ("dti", "=ocenaRyzyka.dti"),
+            ("sciezkaDecyzji", "=ocenaRyzyka.sciezka"),
+            ("wersjaModelu", '="DMN ocena-ryzyka"'),
+        ],
+    },
 }
 
 # --- zadania uzytkownika: kto je widzi na liscie w Tasklist ---
@@ -71,6 +90,11 @@ def camunda():
     for n in bank.nodes:
         if n.id in TYPY_ZADAN:
             n.job_type = TYPY_ZADAN[n.id]
+        if n.id in DECYZJA_DMN:
+            ust = DECYZJA_DMN[n.id]
+            n.decision_id = ust["decision_id"]
+            n.result_variable = ust["result_variable"]
+            n.outputs = ust["outputs"]
         if n.id in GRUPY:
             n.candidate_groups = GRUPY[n.id]
         if n.id == "T_termin":

@@ -29,8 +29,9 @@ USER = os.environ.get("C8_USER", "demo")
 PASS = os.environ.get("C8_PASS", "demo")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL = os.path.join(ROOT, "01-proces-kredytowy", "diagramy",
-                     "wniosek-kredytowy-TO-BE-camunda.bpmn")
+DIAGRAMY = os.path.join(ROOT, "01-proces-kredytowy", "diagramy")
+MODEL = os.path.join(DIAGRAMY, "wniosek-kredytowy-TO-BE-camunda.bpmn")
+DECYZJE = os.path.join(DIAGRAMY, "scoring-kredytowy.dmn")
 
 ID_PROCESU = "wniosek-kredytowy"
 KOMUNIKAT_STARTOWY = "wniosek-kredytowy-zlozony"
@@ -64,24 +65,39 @@ def zapytanie(sciezka, dane=None, metoda=None, surowe=None, content_type=None):
 
 # --------------------------------------------------------------- wdrozenie
 def deploy():
+    """Model procesu i tabele decyzyjne ida w JEDNYM wdrozeniu.
+
+    Osobne wdrozenia potrafia sie rozjechac w czasie: nowa wersja procesu
+    wolalaby decyzje w starej wersji. Jedno wdrozenie zalatwia oba pliki naraz.
+    """
     granica = "----camunda" + str(int(time.time()))
-    with open(MODEL, "rb") as fh:
-        plik = fh.read()
-    czesci = (
-        ("--%s\r\n" % granica).encode()
-        + b'Content-Disposition: form-data; name="resources"; filename="'
-        + os.path.basename(MODEL).encode() + b'"\r\n'
-        + b"Content-Type: application/xml\r\n\r\n" + plik + b"\r\n"
-        + ("--%s--\r\n" % granica).encode()
-    )
+    czesci = b""
+    for sciezka in (MODEL, DECYZJE):
+        with open(sciezka, "rb") as fh:
+            plik = fh.read()
+        czesci += (
+            ("--%s\r\n" % granica).encode()
+            + b'Content-Disposition: form-data; name="resources"; filename="'
+            + os.path.basename(sciezka).encode() + b'"\r\n'
+            + b"Content-Type: application/xml\r\n\r\n" + plik + b"\r\n"
+        )
+    czesci += ("--%s--\r\n" % granica).encode()
     wynik = zapytanie("/deployments", surowe=czesci,
                       content_type="multipart/form-data; boundary=" + granica)
     for el in wynik.get("deployments", []):
         proc = el.get("processDefinition") or {}
+        dec = el.get("decisionDefinition") or {}
+        wym = el.get("decisionRequirementsDefinition") or el.get("decisionRequirements") or {}
         if proc:
-            print("wdrozono %s, wersja %s (klucz %s)" % (
-                proc.get("processDefinitionId"), proc.get("version"),
-                proc.get("processDefinitionKey")))
+            print("proces  %-22s wersja %s" % (proc.get("processDefinitionId"),
+                                               proc.get("version")))
+        elif dec:
+            print("decyzja %-22s wersja %s" % (dec.get("decisionDefinitionId")
+                                               or dec.get("dmnDecisionId"),
+                                               dec.get("version")))
+        elif wym:
+            print("model decyzyjny %s" % (wym.get("decisionRequirementsId")
+                                          or wym.get("dmnDecisionRequirementsId")))
     return wynik
 
 
@@ -132,21 +148,6 @@ def _rejestry(v):
     }
 
 
-def _scoring(v):
-    rata = v["kwota"] / max(v["okresMiesiecy"], 1)
-    dti = 100.0 * (rata + v.get("sumaRatMiesiecznych", 0)) / max(v["dochodNetto"], 1)
-    punkty = 0
-    punkty += 35 if v.get("scoringBik", 0) >= 700 else 20 if v.get("scoringBik", 0) >= 620 else 5
-    punkty += 25 if dti <= 30 else 15 if dti <= 45 else 3
-    punkty += 20 if v.get("stazMiesiecy", 0) >= 24 else 10
-    punkty += 15 if not v.get("wpisyNegatywne") else 0
-    punkty += 5
-    klasa = ("A" if punkty >= 85 else "B" if punkty >= 70 else
-             "C" if punkty >= 55 else "D" if punkty >= 40 else "E")
-    return {"punktacja": punkty, "klasaRyzyka": klasa, "dti": round(dti, 2),
-            "wersjaModelu": "SC-2026.02"}
-
-
 def _decyzja_auto(v):
     return {"decyzja": "POZYTYWNA", "typDecyzji": "AUTOMATYCZNA",
             "kwotaPrzyznana": v["kwota"], "uzasadnienie":
@@ -175,7 +176,6 @@ def _uruchomienie(v):
 OBSLUGA = {
     "walidacja-wniosku": _walidacja,
     "pobranie-raportow": _rejestry,
-    "scoring-kredytowy": _scoring,
     "decyzja-automatyczna": _decyzja_auto,
     "odmowa-automatyczna": _odmowa_auto,
     "generowanie-umowy": _umowa,

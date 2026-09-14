@@ -105,7 +105,14 @@
     <bpmn:businessRuleTask id="T_scoring" name="Wylicz scoring i klase ryzyka">
       <bpmn:documentation>Zadanie regul biznesowych: model scoringowy zwraca punktacje 0-100 i klase ryzyka A-E.</bpmn:documentation>
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="scoring-kredytowy" retries="3" />
+        <zeebe:calledDecision decisionId="ocena-ryzyka" resultVariable="ocenaRyzyka" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=ocenaRyzyka.klasa" target="klasaRyzyka" />
+          <zeebe:output source="=ocenaRyzyka.punktacja" target="punktacja" />
+          <zeebe:output source="=ocenaRyzyka.dti" target="dti" />
+          <zeebe:output source="=ocenaRyzyka.sciezka" target="sciezkaDecyzji" />
+          <zeebe:output source="=&quot;DMN ocena-ryzyka&quot;" target="wersjaModelu" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_6</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_7</bpmn:outgoing>

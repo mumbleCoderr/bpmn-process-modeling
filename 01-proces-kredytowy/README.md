@@ -27,6 +27,7 @@ o niskim ryzyku i małej kwocie, analiza ręczna tam, gdzie potrzebny jest osąd
 5. [Model danych](dokumentacja/05-model-danych.sql) - tabele, ograniczenia, zapytania raportowe
 6. [Mierniki i efekty](dokumentacja/06-mierniki-i-efekty.md) - co mierzymy, czego zmiana nie poprawi, ryzyka
 7. [Uruchomienie w Camunda 8](dokumentacja/07-uruchomienie-camunda.md) - warstwa wykonawcza, workery, trzy przebiegi testowe
+8. [Tabele decyzyjne DMN](dokumentacja/08-tabele-decyzyjne-dmn.md) - scoring jako model decyzyjny, polityki trafień, wywołanie z procesu
 
 ## Trzy decyzje projektowe, których nie widać z samego diagramu
 
@@ -42,6 +43,9 @@ o niskim ryzyku i małej kwocie, analiza ręczna tam, gdzie potrzebny jest osąd
    sprawa kończy się sama, a zadanie znika z listy doradcy. Data w bazie wymagałaby
    procesu, który ją sprawdza - czyli drugiego procesu pilnującego pierwszego.
 
+4. **Progi ryzyka żyją w DMN, nie w procesie.** Zmiana wagi czynnika to nowa wersja
+   decyzji, nie nowa wersja procesu - sprawy w toku nie muszą być migrowane.
+
 ## Pliki źródłowe
 
 | Plik | Opis |
@@ -49,6 +53,7 @@ o niskim ryzyku i małej kwocie, analiza ręczna tam, gdzie potrzebny jest osąd
 | `diagramy/wniosek-kredytowy-AS-IS.bpmn` | model stanu obecnego, BPMN 2.0 |
 | `diagramy/wniosek-kredytowy-TO-BE.bpmn` | model stanu docelowego, BPMN 2.0 |
 | `diagramy/wniosek-kredytowy-TO-BE-camunda.bpmn` | ten sam przebieg z warstwą wykonawczą Zeebe |
+| `diagramy/scoring-kredytowy.dmn` | model scoringowy: trzy decyzje DMN 1.3 |
 | `diagramy/*.png` | podglądy renderowane z plików `.bpmn` |
 | `diagramy/uruchomienie/` | zrzuty z Camunda Operate po wykonaniu procesu |
 

@@ -54,6 +54,9 @@ class Node:
     candidate_groups: str | None = None  # zadanie uzytkownika: grupa, ktora je widzi
     timer: str | None = None         # zdarzenie czasowe: ISO 8601, np. P14D
     message_name: str | None = None  # zdarzenie komunikatu
+    decision_id: str | None = None   # zadanie regul: decyzja DMN wolana przez silnik
+    result_variable: str | None = None   # zmienna z wynikiem decyzji
+    outputs: list | None = None      # mapowanie wyjscia: [(zmienna, wyrazenie FEEL)]
 
     @property
     def shape(self) -> str:
@@ -354,6 +357,15 @@ class Diagram:
         """Rozszerzenia Camunda 8: typ zadania dla workera, zadanie uzytkownika, grupa."""
         e = html.escape
         wnetrze = []
+        if n.decision_id:
+            wnetrze.append('    <zeebe:calledDecision decisionId="' + e(n.decision_id)
+                           + '" resultVariable="' + e(n.result_variable or "wynik") + '" />')
+        if n.outputs:
+            wnetrze.append('    <zeebe:ioMapping>')
+            for zmienna, wyrazenie in n.outputs:
+                wnetrze.append('      <zeebe:output source="' + e(wyrazenie)
+                               + '" target="' + e(zmienna) + '" />')
+            wnetrze.append('    </zeebe:ioMapping>')
         if n.job_type:
             wnetrze.append('    <zeebe:taskDefinition type="' + e(n.job_type) + '" retries="3" />')
         if n.kind == "user":

@@ -22,6 +22,23 @@ USER = os.environ.get("C8_USER", "demo")
 PASS = os.environ.get("C8_PASS", "demo")
 
 
+def _instancja_decyzji(id_decyzji):
+    """Klucz ostatniej ocenionej instancji danej decyzji (REST API v2)."""
+    import base64, json, urllib.request
+    zadanie = json.dumps({"filter": {"decisionDefinitionId": id_decyzji},
+                          "page": {"limit": 1}}).encode()
+    token = base64.b64encode(("%s:%s" % (USER, PASS)).encode()).decode()
+    req = urllib.request.Request(
+        BAZA.split("/operate")[0] + "/v2/decision-instances/search",
+        data=zadanie, method="POST",
+        headers={"Authorization": "Basic " + token,
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as odp:
+        dane = json.loads(odp.read().decode())
+    pozycje = dane.get("items") or []
+    return pozycje[0].get("decisionEvaluationInstanceKey") if pozycje else None
+
+
 def _zamknij_modal(strona):
     """Operate wita powitalnym oknem, ktore zaslania diagram na zrzucie."""
     for etykieta in ["Got it", "Continue", "Close"]:
@@ -73,6 +90,18 @@ def zrzut():
                 strona.screenshot(path=p2)
                 print("zapisano", p2)
                 break
+
+        # widok decyzji: tabela decyzyjna z podswietlona regula.
+        # Instancje wskazujemy z API, nie klikaniem w liste - lista pokazuje
+        # najpierw wyrazenie DTI, a ogladania warta jest tabela punktacji.
+        klucz = _instancja_decyzji("punktacja-kredytowa")
+        if klucz:
+            strona.goto(BAZA + "/decisions/" + klucz, wait_until="domcontentloaded")
+            strona.wait_for_timeout(6000)
+            _zamknij_modal(strona)
+            p3 = os.path.join(WYNIK, "operate-decyzja-dmn.png")
+            strona.screenshot(path=p3)
+            print("zapisano", p3)
         przegladarka.close()
 
 
