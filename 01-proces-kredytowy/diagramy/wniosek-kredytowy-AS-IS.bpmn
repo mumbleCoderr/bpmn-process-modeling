@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_AsIs" targetNamespace="http://bpmn.io/schema/bpmn" exporter="gen_bpmn.py (Mateusz Biernat)" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_AsIs">
+    <bpmn:participant id="P_Klient" name="Klient" />
+    <bpmn:participant id="P_Bank" name="Bank - obsluga wniosku kredytowego (AS-IS)" processRef="Proc_AsIs" />
+    <bpmn:participant id="P_Bik" name="BIK / KRD (portal WWW)" />
+    <bpmn:messageFlow id="M_a1" name="wniosek papierowy" sourceRef="P_Klient" targetRef="A_start" />
+    <bpmn:messageFlow id="M_a2" name="telefon o brakach" sourceRef="A_telefon" targetRef="P_Klient" />
+    <bpmn:messageFlow id="M_a3" name="reczne zapytanie przez portal" sourceRef="A_bik" targetRef="P_Bik" />
+    <bpmn:messageFlow id="M_a4" name="decyzja odmowna (ustnie)" sourceRef="A_info_nie" targetRef="P_Klient" />
+    <bpmn:messageFlow id="M_a5" name="umowa do podpisu" sourceRef="A_podpis" targetRef="P_Klient" />
+  </bpmn:collaboration>
+  <bpmn:process id="Proc_AsIs" isExecutable="false">
+    <bpmn:laneSet id="LS_Proc_AsIs">
+      <bpmn:lane id="L_Doradca" name="Doradca kredytowy (oddzial)">
+        <bpmn:flowNodeRef>A_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_przyjmij</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_excel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_gkomplet</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_telefon</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_mail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_info_nie</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_umowa</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_podpis</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_end_ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_end_nie</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Analityk" name="Analityk ryzyka kredytowego">
+        <bpmn:flowNodeRef>A_bik</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_scoring</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_opinia</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_glimit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_dec_analityk</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A_gdecyzja</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Komitet" name="Komitet kredytowy">
+        <bpmn:flowNodeRef>A_komitet</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="A_start" name="Klient sklada wniosek w oddziale">
+      <bpmn:documentation>Wniosek papierowy, przyjmowany wylacznie w godzinach pracy oddzialu.</bpmn:documentation>
+      <bpmn:outgoing>F_Proc_AsIs_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MED_A_start" />
+    </bpmn:startEvent>
+    <bpmn:userTask id="A_przyjmij" name="Przyjmij wniosek papierowy">
+      <bpmn:documentation>Doradca sprawdza wzrokowo komplet zalacznikow. Brak listy kontrolnej w systemie.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_1</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="A_excel" name="Przepisz dane do arkusza Excel">
+      <bpmn:documentation>Dane przepisywane recznie z formularza papierowego. Zrodlo najczestszych bledow.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_2</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_3</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:exclusiveGateway id="A_gkomplet" name="Komplet dokumentow?">
+      <bpmn:incoming>F_Proc_AsIs_3</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_4</bpmn:outgoing>
+      <bpmn:outgoing>F_Proc_AsIs_6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="A_telefon" name="Zadzwon po brakujace dokumenty">
+      <bpmn:documentation>Brak sladu kontaktu w systemie - ustalenia zostaja w notatniku doradcy.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_4</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="A_mail" name="Wyslij wniosek e-mailem do analityka">
+      <bpmn:documentation>Skan wniosku jako zalacznik. Poza e-mailem nie ma informacji, gdzie jest sprawa.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_5</bpmn:incoming>
+      <bpmn:incoming>F_Proc_AsIs_6</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_7</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="A_info_nie" name="Poinformuj klienta telefonicznie">
+      <bpmn:documentation>Uzasadnienie decyzji przekazywane ustnie, bez zapisu.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_16</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="A_umowa" name="Przygotuj umowe w edytorze tekstu">
+      <bpmn:documentation>Szablon .docx z dysku sieciowego, dane wpisywane recznie po raz drugi.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_15</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_18</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:userTask id="A_podpis" name="Umow klienta na podpis umowy">
+      <bpmn:incoming>F_Proc_AsIs_18</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_19</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="A_end_ok" name="Umowa podpisana">
+      <bpmn:incoming>F_Proc_AsIs_19</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="A_end_nie" name="Wniosek odrzucony">
+      <bpmn:incoming>F_Proc_AsIs_17</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="A_bik" name="Pobierz raport BIK recznie">
+      <bpmn:documentation>Logowanie do portalu, pobranie PDF, zapis na dysku sieciowym.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_7</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="A_scoring" name="Policz scoring w arkuszu">
+      <bpmn:documentation>Arkusz lokalny, wersjonowany nazwa pliku. Kazdy analityk ma wlasna kopie.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_8</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_9</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:userTask id="A_opinia" name="Sporzadz opinie o ryzyku">
+      <bpmn:incoming>F_Proc_AsIs_9</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_10</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="A_glimit" name="Kwota powyzej limitu analityka?">
+      <bpmn:incoming>F_Proc_AsIs_10</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_11</bpmn:outgoing>
+      <bpmn:outgoing>F_Proc_AsIs_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="A_dec_analityk" name="Zatwierdz decyzje kredytowa">
+      <bpmn:incoming>F_Proc_AsIs_12</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_14</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="A_gdecyzja" name="Decyzja pozytywna?">
+      <bpmn:incoming>F_Proc_AsIs_13</bpmn:incoming>
+      <bpmn:incoming>F_Proc_AsIs_14</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_15</bpmn:outgoing>
+      <bpmn:outgoing>F_Proc_AsIs_16</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="A_komitet" name="Rozpatrz wniosek na komitecie">
+      <bpmn:documentation>Komitet zbiera sie raz w tygodniu - wniosek czeka do najblizszego posiedzenia.</bpmn:documentation>
+      <bpmn:incoming>F_Proc_AsIs_11</bpmn:incoming>
+      <bpmn:outgoing>F_Proc_AsIs_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="F_Proc_AsIs_1" sourceRef="A_start" targetRef="A_przyjmij" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_2" sourceRef="A_przyjmij" targetRef="A_excel" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_3" sourceRef="A_excel" targetRef="A_gkomplet" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_4" name="nie" sourceRef="A_gkomplet" targetRef="A_telefon" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_5" sourceRef="A_telefon" targetRef="A_mail" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_6" name="tak" sourceRef="A_gkomplet" targetRef="A_mail" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_7" sourceRef="A_mail" targetRef="A_bik" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_8" sourceRef="A_bik" targetRef="A_scoring" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_9" sourceRef="A_scoring" targetRef="A_opinia" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_10" sourceRef="A_opinia" targetRef="A_glimit" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_11" name="tak" sourceRef="A_glimit" targetRef="A_komitet" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_12" name="nie" sourceRef="A_glimit" targetRef="A_dec_analityk" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_13" sourceRef="A_komitet" targetRef="A_gdecyzja" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_14" sourceRef="A_dec_analityk" targetRef="A_gdecyzja" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_15" name="tak" sourceRef="A_gdecyzja" targetRef="A_umowa" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_16" name="nie" sourceRef="A_gdecyzja" targetRef="A_info_nie" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_17" sourceRef="A_info_nie" targetRef="A_end_nie" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_18" sourceRef="A_umowa" targetRef="A_podpis" />
+    <bpmn:sequenceFlow id="F_Proc_AsIs_19" sourceRef="A_podpis" targetRef="A_end_ok" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Dia_AsIs">
+    <bpmndi:BPMNPlane id="Plane_AsIs" bpmnElement="Collab_AsIs">
+      <bpmndi:BPMNShape id="S_P_Klient" bpmnElement="P_Klient" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="2430" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_P_Bank" bpmnElement="P_Bank" isHorizontal="true">
+        <dc:Bounds x="160" y="220" width="2430" height="720" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_Doradca" bpmnElement="L_Doradca" isHorizontal="true">
+        <dc:Bounds x="190" y="220" width="2400" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_Analityk" bpmnElement="L_Analityk" isHorizontal="true">
+        <dc:Bounds x="190" y="500" width="2400" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_Komitet" bpmnElement="L_Komitet" isHorizontal="true">
+        <dc:Bounds x="190" y="780" width="2400" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_start" bpmnElement="A_start">
+        <dc:Bounds x="297" y="282" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="260" y="324" width="110" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_przyjmij" bpmnElement="A_przyjmij">
+        <dc:Bounds x="420" y="260" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_excel" bpmnElement="A_excel">
+        <dc:Bounds x="600" y="260" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_gkomplet" bpmnElement="A_gkomplet" isMarkerVisible="true">
+        <dc:Bounds x="830" y="275" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_telefon" bpmnElement="A_telefon">
+        <dc:Bounds x="960" y="380" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_mail" bpmnElement="A_mail">
+        <dc:Bounds x="1140" y="260" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_info_nie" bpmnElement="A_info_nie">
+        <dc:Bounds x="2040" y="380" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_umowa" bpmnElement="A_umowa">
+        <dc:Bounds x="2040" y="260" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_podpis" bpmnElement="A_podpis">
+        <dc:Bounds x="2220" y="260" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_end_ok" bpmnElement="A_end_ok">
+        <dc:Bounds x="2457" y="282" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2420" y="324" width="110" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_end_nie" bpmnElement="A_end_nie">
+        <dc:Bounds x="2277" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2240" y="444" width="110" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_bik" bpmnElement="A_bik">
+        <dc:Bounds x="1320" y="540" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_scoring" bpmnElement="A_scoring">
+        <dc:Bounds x="1500" y="540" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_opinia" bpmnElement="A_opinia">
+        <dc:Bounds x="1680" y="540" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_glimit" bpmnElement="A_glimit" isMarkerVisible="true">
+        <dc:Bounds x="1910" y="555" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_dec_analityk" bpmnElement="A_dec_analityk">
+        <dc:Bounds x="2040" y="660" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_gdecyzja" bpmnElement="A_gdecyzja" isMarkerVisible="true">
+        <dc:Bounds x="2270" y="555" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_A_komitet" bpmnElement="A_komitet">
+        <dc:Bounds x="2040" y="820" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_P_Bik" bpmnElement="P_Bik" isHorizontal="true">
+        <dc:Bounds x="160" y="1000" width="2430" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_1" bpmnElement="F_Proc_AsIs_1">
+        <di:waypoint x="333" y="300" />
+        <di:waypoint x="420" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_2" bpmnElement="F_Proc_AsIs_2">
+        <di:waypoint x="570" y="300" />
+        <di:waypoint x="600" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_3" bpmnElement="F_Proc_AsIs_3">
+        <di:waypoint x="750" y="300" />
+        <di:waypoint x="830" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_4" bpmnElement="F_Proc_AsIs_4">
+        <di:waypoint x="880" y="300" />
+        <di:waypoint x="920" y="300" />
+        <di:waypoint x="920" y="420" />
+        <di:waypoint x="960" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_5" bpmnElement="F_Proc_AsIs_5">
+        <di:waypoint x="1110" y="420" />
+        <di:waypoint x="1125" y="420" />
+        <di:waypoint x="1125" y="300" />
+        <di:waypoint x="1140" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_6" bpmnElement="F_Proc_AsIs_6">
+        <di:waypoint x="880" y="300" />
+        <di:waypoint x="1140" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_7" bpmnElement="F_Proc_AsIs_7">
+        <di:waypoint x="1290" y="300" />
+        <di:waypoint x="1305" y="300" />
+        <di:waypoint x="1305" y="580" />
+        <di:waypoint x="1320" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_8" bpmnElement="F_Proc_AsIs_8">
+        <di:waypoint x="1470" y="580" />
+        <di:waypoint x="1500" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_9" bpmnElement="F_Proc_AsIs_9">
+        <di:waypoint x="1650" y="580" />
+        <di:waypoint x="1680" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_10" bpmnElement="F_Proc_AsIs_10">
+        <di:waypoint x="1830" y="580" />
+        <di:waypoint x="1910" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_11" bpmnElement="F_Proc_AsIs_11">
+        <di:waypoint x="1960" y="580" />
+        <di:waypoint x="2000" y="580" />
+        <di:waypoint x="2000" y="860" />
+        <di:waypoint x="2040" y="860" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_12" bpmnElement="F_Proc_AsIs_12">
+        <di:waypoint x="1960" y="580" />
+        <di:waypoint x="2000" y="580" />
+        <di:waypoint x="2000" y="700" />
+        <di:waypoint x="2040" y="700" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_13" bpmnElement="F_Proc_AsIs_13">
+        <di:waypoint x="2190" y="860" />
+        <di:waypoint x="2230" y="860" />
+        <di:waypoint x="2230" y="580" />
+        <di:waypoint x="2270" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_14" bpmnElement="F_Proc_AsIs_14">
+        <di:waypoint x="2190" y="700" />
+        <di:waypoint x="2230" y="700" />
+        <di:waypoint x="2230" y="580" />
+        <di:waypoint x="2270" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_15" bpmnElement="F_Proc_AsIs_15">
+        <di:waypoint x="2295" y="605" />
+        <di:waypoint x="2295" y="650" />
+        <di:waypoint x="2115" y="650" />
+        <di:waypoint x="2115" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_16" bpmnElement="F_Proc_AsIs_16">
+        <di:waypoint x="2295" y="605" />
+        <di:waypoint x="2295" y="650" />
+        <di:waypoint x="2115" y="650" />
+        <di:waypoint x="2115" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_17" bpmnElement="F_Proc_AsIs_17">
+        <di:waypoint x="2190" y="420" />
+        <di:waypoint x="2277" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_18" bpmnElement="F_Proc_AsIs_18">
+        <di:waypoint x="2190" y="300" />
+        <di:waypoint x="2220" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_Proc_AsIs_19" bpmnElement="F_Proc_AsIs_19">
+        <di:waypoint x="2370" y="300" />
+        <di:waypoint x="2457" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_a1" bpmnElement="M_a1">
+        <di:waypoint x="315" y="160" />
+        <di:waypoint x="315" y="282" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_a2" bpmnElement="M_a2">
+        <di:waypoint x="1035" y="380" />
+        <di:waypoint x="1035" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_a3" bpmnElement="M_a3">
+        <di:waypoint x="1395" y="620" />
+        <di:waypoint x="1395" y="1000" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_a4" bpmnElement="M_a4">
+        <di:waypoint x="2115" y="380" />
+        <di:waypoint x="2115" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_a5" bpmnElement="M_a5">
+        <di:waypoint x="2295" y="260" />
+        <di:waypoint x="2295" y="160" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
