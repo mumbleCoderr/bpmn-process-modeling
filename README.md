@@ -22,10 +22,17 @@ kredytu. Dwa modele BPMN (AS-IS i TO-BE) plus pełna dokumentacja wdrożeniowa.
 | [Integracje](01-proces-kredytowy/dokumentacja/04-integracje.md) | kontrakty SOAP i REST, przykładowe komunikaty XML, fragment XSD, obsługa błędów |
 | [Model danych](01-proces-kredytowy/dokumentacja/05-model-danych.sql) | 7 tabel SQL, ograniczenia, indeksy, 5 zapytań raportowych |
 | [Mierniki i efekty](01-proces-kredytowy/dokumentacja/06-mierniki-i-efekty.md) | 7 mierników, porównanie AS-IS i TO-BE, ryzyka wdrożenia |
+| [Uruchomienie w Camunda 8](01-proces-kredytowy/dokumentacja/07-uruchomienie-camunda.md) | wdrożenie modelu w silniku, workery po REST API, trzy przebiegi testowe |
 
 Stan docelowy:
 
 ![Proces kredytowy TO-BE](01-proces-kredytowy/diagramy/wniosek-kredytowy-TO-BE.png)
+
+**Model jest wykonywalny.** Wdrożyłem go w Camunda 8 Run i przepuściłem trzy sprawy
+przez trzy różne ścieżki decyzyjne - poniżej instancja w Operate z podświetloną
+przebytą drogą, historią i zmiennymi:
+
+![Instancja w Operate](01-proces-kredytowy/diagramy/uruchomienie/operate-instancja.png)
 
 ### 2. Produkcja filmu fabularnego (`02-produkcja-filmu/`)
 
@@ -48,6 +55,10 @@ narzedzia/gen_bpmn.py        generator BPMN 2.0 + BPMN DI ze specyfikacji
 narzedzia/build_kredyt.py    specyfikacja obu modeli procesu kredytowego
 narzedzia/render_bpmn.py     render .bpmn do PNG przez bpmn-js w Chromium
 narzedzia/popraw_szczeki.py  korekta etykiet w modelu Bizagi (XPDL w archiwum .bpm)
+narzedzia/build_kredyt_camunda.py  wariant wykonywalny dla Camunda 8 (Zeebe)
+narzedzia/camunda_kredyt.py  wdrozenie, start sprawy i workery po REST API v2
+narzedzia/pdf_dokumentacja.py  skladanie dokumentacji do PDF
+narzedzia/zrzut_operate.py   zrzuty z Operate jako dowod uruchomienia
 ```
 
 Powód jest praktyczny: poprawka jednego zadania nie wymaga przesuwania reszty figur,

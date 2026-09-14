@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_ToBe" targetNamespace="http://bpmn.io/schema/bpmn" exporter="gen_bpmn.py (Mateusz Biernat)" exporterVersion="1.0">
-  <bpmn:collaboration id="Collab_ToBe">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_ToBeCamunda" targetNamespace="http://bpmn.io/schema/bpmn" exporter="gen_bpmn.py (Mateusz Biernat)" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_ToBeCamunda">
     <bpmn:participant id="P_Klient" name="Klient" />
-    <bpmn:participant id="P_Bank" name="Bank - obsluga wniosku kredytowego (TO-BE)" processRef="Proc_ToBe" />
+    <bpmn:participant id="P_Bank" name="Bank - obsluga wniosku kredytowego (TO-BE)" processRef="wniosek-kredytowy" />
     <bpmn:participant id="P_Rejestry" name="Rejestry zewnetrzne (BIK, KRD, CEIDG)" />
     <bpmn:participant id="P_Core" name="System centralny banku (core banking)" />
     <bpmn:messageFlow id="M_t1" name="wniosek z kanalu online (REST)" sourceRef="P_Klient" targetRef="T_start" />
@@ -12,8 +12,9 @@
     <bpmn:messageFlow id="M_t5" name="umowa do podpisu" sourceRef="T_podpis" targetRef="P_Klient" />
     <bpmn:messageFlow id="M_t6" name="zlecenie uruchomienia (SOAP)" sourceRef="T_uruchom" targetRef="P_Core" />
   </bpmn:collaboration>
-  <bpmn:process id="Proc_ToBe" isExecutable="false">
-    <bpmn:laneSet id="LS_Proc_ToBe">
+  <bpmn:message id="Msg_T_start" name="wniosek-kredytowy-zlozony" />
+  <bpmn:process id="wniosek-kredytowy" isExecutable="true">
+    <bpmn:laneSet id="LS_wniosek-kredytowy">
       <bpmn:lane id="T_LDoradca" name="Doradca kredytowy">
         <bpmn:flowNodeRef>T_uzupelnij</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>T_podpis</bpmn:flowNodeRef>
@@ -48,18 +49,28 @@
     </bpmn:laneSet>
     <bpmn:userTask id="T_uzupelnij" name="Uzupelnij dane wniosku z klientem">
       <bpmn:documentation>Zadanie trafia na liste doradcy z SLA 1 dnia roboczego. Kazdy kontakt zapisuje sie w sprawie.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="doradcy" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_3</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_4</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="T_podpis" name="Przekaz umowe do podpisu">
       <bpmn:documentation>Umowa generowana przez system; doradca tylko potwierdza tozsamosc i odbiera podpis.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="doradcy" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_22</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_23</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:boundaryEvent id="T_termin" name="Uplynelo 14 dni" attachedToRef="T_podpis" cancelActivity="true">
       <bpmn:documentation>Regula: decyzja kredytowa wazna 14 dni. Po tym terminie wniosek wygasa automatycznie.</bpmn:documentation>
       <bpmn:outgoing>F_Proc_ToBe_24</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="TED_T_termin" />
+      <bpmn:timerEventDefinition id="TED_T_termin">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P14D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="T_end_wygasl" name="Wniosek wygasl">
       <bpmn:incoming>F_Proc_ToBe_24</bpmn:incoming>
@@ -67,30 +78,39 @@
     <bpmn:startEvent id="T_start" name="Wniosek zlozony w kanale online">
       <bpmn:documentation>Formularz z bankowosci elektronicznej trafia do procesu przez REST.</bpmn:documentation>
       <bpmn:outgoing>F_Proc_ToBe_1</bpmn:outgoing>
-      <bpmn:messageEventDefinition id="MED_T_start" />
+      <bpmn:messageEventDefinition id="MED_T_start" messageRef="Msg_T_start" />
     </bpmn:startEvent>
     <bpmn:serviceTask id="T_waliduj" name="Zwaliduj dane wniosku">
       <bpmn:documentation>Walidacja skladniowa i slownikowa (PESEL, NIP, kwota, okres). REST do uslugi walidacji.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="walidacja-wniosku" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_1</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_2</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="T_gkomplet" name="Dane kompletne?">
+    <bpmn:exclusiveGateway id="T_gkomplet" name="Dane kompletne?" default="F_Proc_ToBe_3">
       <bpmn:incoming>F_Proc_ToBe_2</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_3</bpmn:outgoing>
       <bpmn:outgoing>F_Proc_ToBe_5</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:serviceTask id="T_bik" name="Pobierz raporty BIK i KRD">
       <bpmn:documentation>Zapytanie SOAP do BIK (XML wg schemy XSD), rownolegle REST do KRD. Odpowiedz zapisywana w sprawie.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="pobranie-raportow" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_4</bpmn:incoming>
       <bpmn:incoming>F_Proc_ToBe_5</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_6</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:businessRuleTask id="T_scoring" name="Wylicz scoring i klase ryzyka">
       <bpmn:documentation>Zadanie regul biznesowych: model scoringowy zwraca punktacje 0-100 i klase ryzyka A-E.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="scoring-kredytowy" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_6</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_7</bpmn:outgoing>
     </bpmn:businessRuleTask>
-    <bpmn:exclusiveGateway id="T_gsciezka" name="Klasa ryzyka i kwota wniosku?">
+    <bpmn:exclusiveGateway id="T_gsciezka" name="Klasa ryzyka i kwota wniosku?" default="F_Proc_ToBe_10">
       <bpmn:documentation>Rozgalezienie sciezki: odmowa automatyczna, decyzja automatyczna albo analiza reczna.</bpmn:documentation>
       <bpmn:incoming>F_Proc_ToBe_7</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_8</bpmn:outgoing>
@@ -99,11 +119,17 @@
     </bpmn:exclusiveGateway>
     <bpmn:serviceTask id="T_auto" name="Wydaj decyzje automatyczna">
       <bpmn:documentation>Klasa A-B i kwota do 50 000 zl: decyzja bez udzialu czlowieka.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="decyzja-automatyczna" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_8</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_16</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:serviceTask id="T_odmowa_auto" name="Zarejestruj odmowe automatyczna">
       <bpmn:documentation>Klasa E lub negatywna weryfikacja rejestrow: odmowa bez analizy recznej.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="odmowa-automatyczna" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_9</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_20</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -113,18 +139,24 @@
       <bpmn:incoming>F_Proc_ToBe_16</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_17</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:exclusiveGateway id="T_gdecyzja" name="Decyzja pozytywna?">
+    <bpmn:exclusiveGateway id="T_gdecyzja" name="Decyzja pozytywna?" default="F_Proc_ToBe_19">
       <bpmn:incoming>F_Proc_ToBe_17</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_18</bpmn:outgoing>
       <bpmn:outgoing>F_Proc_ToBe_19</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:serviceTask id="T_umowa" name="Wygeneruj umowe kredytowa">
       <bpmn:documentation>SOAP do systemu dokumentowego; dane umowy jako XML zgodny z XSD. Zero przepisywania recznego.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generowanie-umowy" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_18</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_22</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:serviceTask id="T_powiadom" name="Wyslij decyzje odmowna z uzasadnieniem">
       <bpmn:documentation>REST do kanalu powiadomien. Uzasadnienie z regul scoringowych, nie z rozmowy telefonicznej.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="powiadomienie-klienta" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_19</bpmn:incoming>
       <bpmn:incoming>F_Proc_ToBe_20</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_21</bpmn:outgoing>
@@ -134,6 +166,9 @@
     </bpmn:endEvent>
     <bpmn:serviceTask id="T_uruchom" name="Przekaz uruchomienie kredytu do core">
       <bpmn:documentation>SOAP do systemu centralnego; potwierdzenie zwrotne zamyka sprawe.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="uruchomienie-kredytu" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_23</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_25</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -142,20 +177,32 @@
     </bpmn:endEvent>
     <bpmn:userTask id="T_analiza" name="Przeprowadz analize ryzyka kredytowego">
       <bpmn:documentation>Formularz analizy w systemie, z raportami BIK/KRD i wynikiem scoringu w kontekscie sprawy. SLA 2 dni robocze.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="analitycy-ryzyka" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_10</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_11</bpmn:outgoing>
     </bpmn:userTask>
-    <bpmn:exclusiveGateway id="T_glimit" name="Kwota powyzej limitu decyzyjnego?">
+    <bpmn:exclusiveGateway id="T_glimit" name="Kwota powyzej limitu decyzyjnego?" default="F_Proc_ToBe_13">
       <bpmn:incoming>F_Proc_ToBe_11</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_12</bpmn:outgoing>
       <bpmn:outgoing>F_Proc_ToBe_13</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:userTask id="T_dec_analityk" name="Podejmij decyzje kredytowa">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="analitycy-ryzyka" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_13</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_14</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="T_komitet" name="Rozpatrz wniosek na komitecie">
       <bpmn:documentation>Wniosek trafia na liste komitetu od razu po analizie, bez czekania na posiedzenie.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="komitet-kredytowy" />
+      </bpmn:extensionElements>
       <bpmn:incoming>F_Proc_ToBe_12</bpmn:incoming>
       <bpmn:outgoing>F_Proc_ToBe_15</bpmn:outgoing>
     </bpmn:userTask>
@@ -163,20 +210,30 @@
     <bpmn:sequenceFlow id="F_Proc_ToBe_2" sourceRef="T_waliduj" targetRef="T_gkomplet" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_3" name="nie" sourceRef="T_gkomplet" targetRef="T_uzupelnij" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_4" sourceRef="T_uzupelnij" targetRef="T_bik" />
-    <bpmn:sequenceFlow id="F_Proc_ToBe_5" name="tak" sourceRef="T_gkomplet" targetRef="T_bik" />
+    <bpmn:sequenceFlow id="F_Proc_ToBe_5" name="tak" sourceRef="T_gkomplet" targetRef="T_bik">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=daneKompletne = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="F_Proc_ToBe_6" sourceRef="T_bik" targetRef="T_scoring" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_7" sourceRef="T_scoring" targetRef="T_gsciezka" />
-    <bpmn:sequenceFlow id="F_Proc_ToBe_8" name="klasa A-B, do 50 tys." sourceRef="T_gsciezka" targetRef="T_auto" />
-    <bpmn:sequenceFlow id="F_Proc_ToBe_9" name="klasa E" sourceRef="T_gsciezka" targetRef="T_odmowa_auto" />
+    <bpmn:sequenceFlow id="F_Proc_ToBe_8" name="klasa A-B, do 50 tys." sourceRef="T_gsciezka" targetRef="T_auto">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=klasaRyzyka in (&quot;A&quot;,&quot;B&quot;) and kwota &lt;= 50000</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Proc_ToBe_9" name="klasa E" sourceRef="T_gsciezka" targetRef="T_odmowa_auto">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=klasaRyzyka = &quot;E&quot;</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="F_Proc_ToBe_10" name="klasa C-D" sourceRef="T_gsciezka" targetRef="T_analiza" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_11" sourceRef="T_analiza" targetRef="T_glimit" />
-    <bpmn:sequenceFlow id="F_Proc_ToBe_12" name="tak" sourceRef="T_glimit" targetRef="T_komitet" />
+    <bpmn:sequenceFlow id="F_Proc_ToBe_12" name="tak" sourceRef="T_glimit" targetRef="T_komitet">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=kwota &gt; 100000</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="F_Proc_ToBe_13" name="nie" sourceRef="T_glimit" targetRef="T_dec_analityk" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_14" sourceRef="T_dec_analityk" targetRef="T_zbierz" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_15" sourceRef="T_komitet" targetRef="T_zbierz" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_16" sourceRef="T_auto" targetRef="T_zbierz" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_17" sourceRef="T_zbierz" targetRef="T_gdecyzja" />
-    <bpmn:sequenceFlow id="F_Proc_ToBe_18" name="tak" sourceRef="T_gdecyzja" targetRef="T_umowa" />
+    <bpmn:sequenceFlow id="F_Proc_ToBe_18" name="tak" sourceRef="T_gdecyzja" targetRef="T_umowa">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decyzja = &quot;POZYTYWNA&quot;</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="F_Proc_ToBe_19" name="nie" sourceRef="T_gdecyzja" targetRef="T_powiadom" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_20" sourceRef="T_odmowa_auto" targetRef="T_powiadom" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_21" sourceRef="T_powiadom" targetRef="T_end_nie" />
@@ -185,8 +242,8 @@
     <bpmn:sequenceFlow id="F_Proc_ToBe_24" sourceRef="T_termin" targetRef="T_end_wygasl" />
     <bpmn:sequenceFlow id="F_Proc_ToBe_25" sourceRef="T_uruchom" targetRef="T_end_ok" />
   </bpmn:process>
-  <bpmndi:BPMNDiagram id="Dia_ToBe">
-    <bpmndi:BPMNPlane id="Plane_ToBe" bpmnElement="Collab_ToBe">
+  <bpmndi:BPMNDiagram id="Dia_ToBeCamunda">
+    <bpmndi:BPMNPlane id="Plane_ToBeCamunda" bpmnElement="Collab_ToBeCamunda">
       <bpmndi:BPMNShape id="S_P_Klient" bpmnElement="P_Klient" isHorizontal="true">
         <dc:Bounds x="160" y="80" width="2970" height="80" />
       </bpmndi:BPMNShape>

@@ -49,6 +49,11 @@ class Node:
     event_def: str | None = None   # message / timer / terminate
     attached_to: str | None = None # tylko dla boundary
     doc: str = ""
+    # --- pola uzywane tylko w wariancie wykonywalnym (Camunda 8 / Zeebe) ---
+    job_type: str | None = None      # zadanie uslugowe: typ zadania dla workera
+    candidate_groups: str | None = None  # zadanie uzytkownika: grupa, ktora je widzi
+    timer: str | None = None         # zdarzenie czasowe: ISO 8601, np. P14D
+    message_name: str | None = None  # zdarzenie komunikatu
 
     @property
     def shape(self) -> str:
@@ -69,6 +74,8 @@ class Flow:
     src: str
     dst: str
     name: str = ""
+    condition: str | None = None     # wyrazenie FEEL na przeplywie warunkowym
+    default: bool = False            # przeplyw domyslny bramki
 
 
 @dataclass
@@ -102,6 +109,7 @@ class Diagram:
         self.id = ident
         self.name = name
         self.cols = cols
+        self.zeebe = False      # True = wariant wykonywalny dla Camunda 8
         self.pools: list[Pool] = []
         self.messages: list[Message] = []
         self._geo: dict[str, tuple[int, int, int, int]] = {}
@@ -199,7 +207,9 @@ class Diagram:
             'xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" '
             'xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" '
             'xmlns:di="http://www.omg.org/spec/DD/20100524/DI" '
-            'id="Definitions_' + self.id + '" '
+            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+            + ('xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" ' if self.zeebe else '')
+            + 'id="Definitions_' + self.id + '" '
             'targetNamespace="http://bpmn.io/schema/bpmn" '
             'exporter="gen_bpmn.py (Mateusz Biernat)" exporterVersion="1.0">'
         )
@@ -213,11 +223,18 @@ class Diagram:
                 'sourceRef="' + m.src + '" targetRef="' + m.dst + '" />'
             )
         L.append('  </bpmn:collaboration>')
+        if self.zeebe:
+            for p in self.pools:
+                for n in p.nodes:
+                    if n.message_name:
+                        L.append('  <bpmn:message id="Msg_' + n.id + '" name="'
+                                 + e(n.message_name) + '" />')
 
         for p in self.pools:
             if not p.process_id:
                 continue
-            L.append('  <bpmn:process id="' + p.process_id + '" isExecutable="false">')
+            wykonywalny = "true" if self.zeebe else "false"
+            L.append('  <bpmn:process id="' + p.process_id + '" isExecutable="' + wykonywalny + '">')
             if p.lanes:
                 L.append('    <bpmn:laneSet id="LS_' + p.process_id + '">')
                 for lane in p.lanes:
@@ -230,10 +247,17 @@ class Diagram:
                 L.extend("    " + s for s in self._node_xml(n, p))
             for f in p.flows:
                 nm = ' name="' + e(f.name) + '"' if f.name else ""
-                L.append(
-                    '    <bpmn:sequenceFlow id="' + f.id + '"' + nm +
-                    ' sourceRef="' + f.src + '" targetRef="' + f.dst + '" />'
-                )
+                if self.zeebe and f.condition:
+                    L.append('    <bpmn:sequenceFlow id="' + f.id + '"' + nm +
+                             ' sourceRef="' + f.src + '" targetRef="' + f.dst + '">')
+                    L.append('      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">'
+                             + e(f.condition) + '</bpmn:conditionExpression>')
+                    L.append('    </bpmn:sequenceFlow>')
+                else:
+                    L.append(
+                        '    <bpmn:sequenceFlow id="' + f.id + '"' + nm +
+                        ' sourceRef="' + f.src + '" targetRef="' + f.dst + '" />'
+                    )
             L.append('  </bpmn:process>')
 
         L.append('  <bpmndi:BPMNDiagram id="Dia_' + self.id + '">')
@@ -282,6 +306,9 @@ class Diagram:
         body = []
         if n.doc:
             body.append('  <bpmn:documentation>' + e(n.doc) + '</bpmn:documentation>')
+        # kolejnosc wg schemy BPMN: documentation, extensionElements, incoming, outgoing
+        if self.zeebe:
+            body += self._zeebe_ext(n)
         body += ['  <bpmn:incoming>' + i + '</bpmn:incoming>' for i in ins]
         body += ['  <bpmn:outgoing>' + o + '</bpmn:outgoing>' for o in outs]
 
@@ -300,15 +327,43 @@ class Diagram:
         else:
             tag, attrs = TASK_TYPES[n.kind], ""
 
+        if n.kind == "xor" and self.zeebe:
+            domyslny = [f.id for f in pool.flows if f.src == n.id and f.default]
+            if domyslny:
+                attrs += ' default="' + domyslny[0] + '"'
+
         if n.event_def == "message":
-            body.append('  <bpmn:messageEventDefinition id="MED_' + n.id + '" />')
+            ref = ' messageRef="Msg_' + n.id + '"' if (self.zeebe and n.message_name) else ''
+            body.append('  <bpmn:messageEventDefinition id="MED_' + n.id + '"' + ref + ' />')
         elif n.event_def == "timer":
-            body.append('  <bpmn:timerEventDefinition id="TED_' + n.id + '" />')
+            if self.zeebe and n.timer:
+                body.append('  <bpmn:timerEventDefinition id="TED_' + n.id + '">')
+                body.append('    <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">'
+                            + e(n.timer) + '</bpmn:timeDuration>')
+                body.append('  </bpmn:timerEventDefinition>')
+            else:
+                body.append('  <bpmn:timerEventDefinition id="TED_' + n.id + '" />')
         elif n.event_def == "terminate":
             body.append('  <bpmn:terminateEventDefinition id="TRD_' + n.id + '" />')
 
         head = '<bpmn:' + tag + ' id="' + n.id + '" name="' + e(n.name) + '"' + attrs + '>'
         return [head] + body + ['</bpmn:' + tag + '>']
+
+
+    def _zeebe_ext(self, n: Node):
+        """Rozszerzenia Camunda 8: typ zadania dla workera, zadanie uzytkownika, grupa."""
+        e = html.escape
+        wnetrze = []
+        if n.job_type:
+            wnetrze.append('    <zeebe:taskDefinition type="' + e(n.job_type) + '" retries="3" />')
+        if n.kind == "user":
+            wnetrze.append('    <zeebe:userTask />')
+            if n.candidate_groups:
+                wnetrze.append('    <zeebe:assignmentDefinition candidateGroups="'
+                               + e(n.candidate_groups) + '" />')
+        if not wnetrze:
+            return []
+        return ['  <bpmn:extensionElements>'] + wnetrze + ['  </bpmn:extensionElements>']
 
 
 def sanity(d: Diagram) -> list[str]:

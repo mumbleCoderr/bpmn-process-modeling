@@ -26,6 +26,7 @@ o niskim ryzyku i małej kwocie, analiza ręczna tam, gdzie potrzebny jest osąd
 4. [Specyfikacja integracji](dokumentacja/04-integracje.md) - SOAP, REST, przykładowe XML, XSD, obsługa błędów
 5. [Model danych](dokumentacja/05-model-danych.sql) - tabele, ograniczenia, zapytania raportowe
 6. [Mierniki i efekty](dokumentacja/06-mierniki-i-efekty.md) - co mierzymy, czego zmiana nie poprawi, ryzyka
+7. [Uruchomienie w Camunda 8](dokumentacja/07-uruchomienie-camunda.md) - warstwa wykonawcza, workery, trzy przebiegi testowe
 
 ## Trzy decyzje projektowe, których nie widać z samego diagramu
 
@@ -47,7 +48,9 @@ o niskim ryzyku i małej kwocie, analiza ręczna tam, gdzie potrzebny jest osąd
 |---|---|
 | `diagramy/wniosek-kredytowy-AS-IS.bpmn` | model stanu obecnego, BPMN 2.0 |
 | `diagramy/wniosek-kredytowy-TO-BE.bpmn` | model stanu docelowego, BPMN 2.0 |
+| `diagramy/wniosek-kredytowy-TO-BE-camunda.bpmn` | ten sam przebieg z warstwą wykonawczą Zeebe |
 | `diagramy/*.png` | podglądy renderowane z plików `.bpmn` |
+| `diagramy/uruchomienie/` | zrzuty z Camunda Operate po wykonaniu procesu |
 
 Modele powstają z `narzedzia/build_kredyt.py` - patrz README główne.
 
