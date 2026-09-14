@@ -100,7 +100,11 @@ def md_na_html(md: str) -> str:
             while i < len(linie) and (re.match(r'^\s*[-*]\s+', linie[i]) or re.match(r'^\s*\d+\.\s+', linie[i])):
                 elementy.append(re.sub(r'^\s*(?:[-*]|\d+\.)\s+', '', linie[i]))
                 i += 1
-                while i < len(linie) and linie[i].startswith("   ") and linie[i].strip():
+                # ciag dalszy punktu: wciecie dwoma spacjami wystarczy, bo tak
+                # zapisuje sie zawijane punkty listy w Markdownie
+                while (i < len(linie) and linie[i].startswith("  ")
+                       and linie[i].strip()
+                       and not re.match(r'^\s*(?:[-*]|\d+\.)\s+', linie[i])):
                     elementy[-1] += " " + linie[i].strip()
                     i += 1
             out.append("<%s>%s</%s>" % (tag, "".join("<li>%s</li>" % inline(e) for e in elementy), tag))
